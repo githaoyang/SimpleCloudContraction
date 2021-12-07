@@ -6,9 +6,11 @@ extractSkeleton::extractSkeleton()
 	cloudIteration = 0;
 	nodeDensity = 12;
 	nodeIteration = 0;
+
+	skeletonGraph = new Graph();
 }
 
-void extractSkeleton::prepareSkeletonDataStructure(PointCloudT::Ptr acloud)
+void extractSkeleton::prepareExtractNodePoint(PointCloudT::Ptr acloud)
 {
 	isPointVisited.clear();
 	isPointVisited.assign(acloud->size(), false);
@@ -22,13 +24,10 @@ void extractSkeleton::prepareSkeletonDataStructure(PointCloudT::Ptr acloud)
 	circleSize = sqrt(pow(min_point_AABB.x - max_point_AABB.x, 2) +
 		pow(min_point_AABB.y - max_point_AABB.y, 2) + pow(min_point_AABB.z - max_point_AABB.z, 2)) / nodeDensity;
 
-
 	kdtree.setInputCloud(cloud);
-
-
 }
 
-int extractSkeleton::extractCurrentSkePoint()
+int extractSkeleton::extractCurrentNodePoint()
 {
 	do
 	{
@@ -63,6 +62,58 @@ int extractSkeleton::extractCurrentSkePoint()
 
 	} while (nextNode.empty() == false);
 	return 0;
+}
+
+void extractSkeleton::removeDuplicatedNode()
+{
+	int maxHeight = 0;
+	int listSize = nodeList.size();
+	double radius = circleSize / 6;
+	PointT maxHeightPoint;
+	localNodeCloud.reset(new PointCloudT);
+	for (auto i : nodeList)
+	{
+		localNodeCloud->points.emplace_back(i);
+	}
+	kdtree.setInputCloud(localNodeCloud);
+	//找最高点（头部)
+	for (int i = 0; i < localNodeCloud->size(); i++)
+	{
+		PointT tempPoint = (*localNodeCloud)[i];
+		if (tempPoint.y > maxHeight)
+		{
+			maxHeightPoint = tempPoint;
+		}
+	}
+	
+	std::vector<int> pointIdxKNNSearch(listSize);
+	std::vector<float> pointKNNSquaredDistance(listSize);
+	kdtree.nearestKSearch(maxHeightPoint, listSize, pointIdxKNNSearch, pointKNNSquaredDistance);
+
+	nodeList.clear();
+	for (int i = 0; i < pointIdxKNNSearch.size(); i++)
+	{
+		nodeList.emplace_back((*localNodeCloud)[pointIdxKNNSearch[i]]);
+	}
+
+	auto tempIndice = 0;
+	auto tempNextIndice = tempIndice+1;
+	while (tempNextIndice < nodeList.size())
+	{
+		PointT tempPoint = nodeList[tempIndice];
+		PointT nextTempPoint = nodeList[tempNextIndice];
+		float distanceOfTwoClosePoint = pow(tempPoint.x - nextTempPoint.x, 2)
+			+ pow(tempPoint.y - nextTempPoint.y, 2) + pow(tempPoint.z - nextTempPoint.z, 2);
+		if (distanceOfTwoClosePoint < 4 * radius*radius)
+		{
+			nodeList.erase(nodeList.begin() + tempNextIndice);
+		}
+		else
+		{
+			tempIndice++;
+		}
+		tempNextIndice = tempIndice+1;
+	}
 }
 
 //找最远的点（在主特征向量方向上）作为下一个node节点
@@ -170,24 +221,80 @@ void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<flo
 
 }
 
-void extractSkeleton::connectSkeltonNode()
+void extractSkeleton::connectSkeltonNode(int circleSize)
+{
+	averageLength = circleSize/3;
+	prepareNodesDataStructure();
+}
+
+void extractSkeleton::prepareNodesDataStructure()
 {
 	localNodeCloud.reset(new PointCloudT);
+	int maxHeight = 0;
+	maxHeightPointIndice = 0;
+
+	int sumLength = 0;
 	
+
+	ArcNodePtr edge;
+	//待访问的节点列表
+	stack<int> leftNodeList;
+
 	for (auto i : nodeList)
 	{
 		localNodeCloud->points.emplace_back(i);
 	}
 	kdtree.setInputCloud(localNodeCloud);
 
-	PointT currPoint = (*localNodeCloud)[nodeIteration];
-	std::vector<int> pointIdxRadiusSearch;
-	std::vector<float> pointRadiusSquaredDistance;
-	kdtree.radiusSearch(currPoint, circleSize, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+	for (int i = 0; i < localNodeCloud->size(); i++)
+	{
+		PointT tempPoint = (*localNodeCloud)[i];
+		if (tempPoint.y > maxHeight)
+		{
+			maxHeightPointIndice = i;
+		}
+		skeletonGraph->adjList.emplace_back(new VertexNode(i));
+	}
+	leftNodeList.emplace(maxHeightPointIndice);
 
+	while (leftNodeList.empty() == false)
+	{
+		int currentNodeIndice = leftNodeList.top();
+		int K = 4;
+		leftNodeList.pop();
+		PointT currPoint = (*localNodeCloud)[currentNodeIndice];
+		std::vector<int> pointIdxKNNSearch(K);
+		std::vector<float> pointKNNSquaredDistance(K);
+		kdtree.nearestKSearch(currPoint, K, pointIdxKNNSearch, pointKNNSquaredDistance);
+
+		for (int i = 0; i < K; i++)
+		{
+			int pointIndice = pointIdxKNNSearch[i];
+			if (skeletonGraph->adjList[pointIndice]->isVisited == true || currentNodeIndice == pointIndice)
+			{
+				continue;
+			}
+
+			
+			if (sqrt(pointKNNSquaredDistance[i]) > averageLength * 10)
+			{
+				continue;
+			}
+			sumLength = sumLength + pointKNNSquaredDistance[i];
+			averageLength = sumLength / (leftNodeList.size() + 1);
+			leftNodeList.emplace(pointIndice);
+			edge = new ArcNode();
+			edge->adjvex = pointIndice;
+			edge->next = skeletonGraph->adjList[currentNodeIndice]->firstedge;
+			skeletonGraph->adjList[currentNodeIndice]->firstedge = edge;
+			break;
+		}
+		skeletonGraph->adjList[currentNodeIndice]->isVisited = true;
+	}
 }
 
-void extractSkeleton::prepareNodesDataStructure()
+
+void extractSkeleton::visitAllNodes() 
 {
 
 }

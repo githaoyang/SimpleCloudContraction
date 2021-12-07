@@ -30,9 +30,11 @@ SimpleCloudContraction::SimpleCloudContraction(QWidget *parent)
 	QObject::connect(ui.savePCDFileButton, SIGNAL(clicked()), this, SLOT(savePCDSlot()));
 	QObject::connect(ui.startVoxelTransformButton, SIGNAL(clicked()), this, SLOT(startVoxelTransformSlot()));
 	QObject::connect(ui.resetVoxelButton, SIGNAL(clicked()), this, SLOT(resetVoxelSlot()));
-	QObject::connect(ui.extractCurrentSkePointButton, SIGNAL(clicked()), this, SLOT(extractCurrentSkePointSlot()));
-	QObject::connect(ui.resetSkeletonButton, SIGNAL(clicked()), this, SLOT(resetSkeletonPointSlot()));
+	QObject::connect(ui.extractCurrentNodeButton, SIGNAL(clicked()), this, SLOT(extractCurrentNodeSlot()));
+	QObject::connect(ui.resetNodeButton, SIGNAL(clicked()), this, SLOT(resetNodePointSlot()));
 	QObject::connect(ui.connectNodesButton, SIGNAL(clicked()), this, SLOT(connectNodesSlot()));
+	QObject::connect(ui.resetConnectedLinesButton, SIGNAL(clicked()), this, SLOT(resetNodeConnectLineSlot()));
+	
 	
 	
 	QObject::connect(ui.setNeighborSizeLineEdit, SIGNAL(editingFinished()), this, SLOT(setNeighborSizeSlot()));
@@ -118,14 +120,17 @@ void SimpleCloudContraction::showPointCloud()
 
 }
 
+//进行一次全局所有点的搜索
 void SimpleCloudContraction::openNextFrameSlot()
 {
 	int pointCloudSize = cloudManager->cloud->points.size();
+	cloudManager->principal_Directivity.resize(pointCloudSize, 0);
 	for (int i = 0; i < pointCloudSize; i++)
 	{
-		ui.textBrowser->append(QString::number(cloudManager->cloudIteration));
+		ui.textBrowser->append(QString::number(cloudManager->cloudIteration)
+			+ " , 线性度：" + QString::number(cloudManager->principal_Directivity[i]).left(5));
 		ui.textBrowser->repaint();
-		cloudManager->pointsContraction(1);
+		cloudManager->pointsContraction();
 		showPointCloud();
 
 		QString PCARadiusSize = "PCA半径：" + QString::number(cloudManager->PCARadiusSize * 3);
@@ -223,36 +228,37 @@ void SimpleCloudContraction::resetVoxelSlot()
 }
 
 
-void SimpleCloudContraction::extractCurrentSkePointSlot()
+void SimpleCloudContraction::extractCurrentNodeSlot()
 {
 	//准备数据结构
-	skeletonManager->prepareSkeletonDataStructure(cloudManager->cloud);
+	skeletonManager->prepareExtractNodePoint(cloudManager->cloud);
 	double radius = skeletonManager->circleSize / 6;
 
-	while (skeletonManager->extractCurrentSkePoint() >= 0)
-	{
-		for (; nodeIndice < skeletonManager->nodeList.size(); nodeIndice++)
-		{
-			string sphere = "sphere" + to_string(nodeIndice);
-			viewer->addSphere(skeletonManager->nodeList[nodeIndice], radius, 0, 255, 0, sphere);
-			ui.transformStatusLabel->setText(QString::fromStdString(sphere + "已绘制"));
-			ui.transformStatusLabel->repaint();
-			ui.screen->repaint();
+	while (skeletonManager->extractCurrentNodePoint() >= 0)
+	{}
+	//skeletonManager->removeDuplicatedNode();
 
-		}
+	for (int nodeIndice = 0; nodeIndice < skeletonManager->nodeList.size(); nodeIndice++)
+	{
+		string sphere = "sphere" + to_string(nodeIndice+1);
+		viewer->addSphere(skeletonManager->nodeList[nodeIndice], radius, 0, 255, 0, sphere);
+		ui.transformStatusLabel->setText(QString::fromStdString(sphere + "已绘制"));
+		ui.transformStatusLabel->repaint();
+		ui.screen->repaint();
+
 	}
-	ui.transformStatusLabel->setText(QString::fromStdString("已全部绘制"+to_string(nodeIndice)+ "个节点"));
+	
+	ui.transformStatusLabel->setText(QString::fromStdString("已全部绘制"+to_string(skeletonManager->nodeList.size())+ "个节点"));
 	ui.transformStatusLabel->repaint();
 	
 }
 
-void SimpleCloudContraction::resetSkeletonPointSlot()
+void SimpleCloudContraction::resetNodePointSlot()
 {
-	for (nodeIndice = 0; nodeIndice < skeletonManager->nodeList.size(); nodeIndice++)
+	for (int nodeIndice = 1; nodeIndice <= skeletonManager->nodeList.size(); nodeIndice++)
 	{
 		viewer->removeShape("sphere" + to_string(nodeIndice));
 	}
-	nodeIndice = 0;
 	skeletonManager->cloudIteration = 0;
 	skeletonManager->isPointVisited.assign(100, false);
 	skeletonManager->nodeList.clear();
@@ -273,5 +279,33 @@ void SimpleCloudContraction::setNodeDensitySlot()
 
 void SimpleCloudContraction::connectNodesSlot()
 {
-	skeletonManager->connectSkeltonNode();
+	lineCount = 0;
+	string lineName;
+	skeletonManager->connectSkeltonNode(skeletonManager->circleSize);
+	for (int i = 0; i < skeletonManager->nodeList.size(); i++)
+	{
+		PointT startPoint, endPoint;
+
+		startPoint = (*skeletonManager->localNodeCloud)[skeletonManager->skeletonGraph->adjList[i]->vertex];
+		ArcNodePtr nodeptr = skeletonManager->skeletonGraph->adjList[i]->firstedge;
+		while (nodeptr != nullptr)
+		{
+			lineCount++;
+			lineName = "line" + to_string(lineCount);
+			endPoint = (*skeletonManager->localNodeCloud)[nodeptr->adjvex];
+			nodeptr = nodeptr->next;
+			viewer->addLine(startPoint, endPoint, 0, 0, 1, lineName);
+			viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, lineName);
+			ui.screen->repaint();
+		}
+	}
+}
+
+void SimpleCloudContraction::resetNodeConnectLineSlot()
+{
+	for (; lineCount>0; lineCount--)
+	{
+		viewer->removeShape("line" + to_string(lineCount));
+	}
+	ui.screen->repaint();
 }

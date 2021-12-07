@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <vector>
 #include <queue>
+#include <stack>
 
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -36,58 +37,75 @@ using namespace pcl;
 
 class skeletonPoint;
 class Graph;
+struct VertexNode;
+struct ArcNode;
+typedef ArcNode* ArcNodePtr;
 
 class extractSkeleton
 {
 public:
 	extractSkeleton();
-
-	void prepareSkeletonDataStructure(PointCloudT::Ptr cloud);
-	int extractCurrentSkePoint();
+	//用于提取关键点时准备所需数据结构
+	void prepareExtractNodePoint(PointCloudT::Ptr cloud);
+	int extractCurrentNodePoint();
 	void findNextNode(vector<int>& pointIdxRadiusSearch, vector<float>& pointRadiusSquaredDistance);
-	void connectSkeltonNode();
+	void connectSkeltonNode(int circleSize);
+	void removeDuplicatedNode();
+	void visitAllNodes();
+
+	//用于连接节点时准备所需数据（图）结构
 	void prepareNodesDataStructure();
 
 	pcl::KdTreeFLANN<PointT> kdtree;
 	PointCloudT::Ptr cloud;							//点云指针 操作点云
+	PointCloudT::Ptr localNodeCloud;
 	PointT min_point_AABB;
 	PointT max_point_AABB;
 	PointT searchPoint;
 	float circleSize;
 	int cloudIteration;
 	int nodeIteration;
-	int nodeDensity;
+	int nodeDensity; 
+	int maxHeightPointIndice;
 
+	//用于提取关键点时判断节点是否访问过
 	vector<bool> isPointVisited;
+	//用于判断node节点的队列
 	queue<PointT> nextNode;
+	//node列表
 	vector<PointT> nodeList;
+	//node节点图结构指针
+	Graph* skeletonGraph;
 
 private:
-	PointCloudT::Ptr localNodeCloud;
-
+	int averageLength;
 };
 
 
-class skeletonPoint
-{
-public:
-
-	skeletonPoint(int i, bool flag) :indice(i), isVisited(flag) {};
-
-	int indice;
-	bool isVisited = false;
-
-};
-
+//提取骨骼点所用的图结构
 class Graph
 {
 public:
+	vector<VertexNode*> adjList;
+	int vexNum;
+	int edgeNum;	
+};
+
+
+// 定义边表结点
+struct ArcNode
+{
+	int adjvex;// 邻接点域
+	ArcNodePtr next;
+};
+
+
+// 定义顶点表结点
+struct VertexNode
+{
+	VertexNode(int _vertex) :vertex(_vertex) {};
 	int vertex;
-	vector<Graph*> next;
-	Graph(int _vertex)
-	{
-		vertex = _vertex;
-		next.emplace_back(NULL);
-	}
-	bool isVisited;
+	ArcNodePtr firstedge = nullptr;
+	bool isVisited = false;
+	bool isConnected = false;
 };

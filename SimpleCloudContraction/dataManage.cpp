@@ -9,7 +9,7 @@ dataManager::dataManager()
 	nextFrameCloud->resize(1);
 	cloud->resize(1);
 	rawCloud->resize(1);
-	pcl::io::loadPCDFile("G:/bodyleftForcontraction.pcd", *rawCloud);
+	pcl::io::loadPCDFile("G:/newOnePerson.pcd", *rawCloud);
 	pcl::copyPointCloud(*rawCloud, *cloud);
 
 
@@ -19,8 +19,8 @@ dataManager::dataManager()
 	downSamplingNeigborSize = 50;
 	linearity = 0.8;
 	voxelSize = 10;
-
-	getAverageNeigborSize(cloud->size()/2);
+	principal_Directivity.assign(rawCloud->size(), 0);
+	getAverageNeigborSize(cloud->size() / 2);
 
 
 }
@@ -75,7 +75,7 @@ void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& 
 {
 	//获取PCA局部邻域点云
 	pcl::PointCloud<PointT>::Ptr localCloud(new pcl::PointCloud<PointT>);
-	for (auto i : pointIdxRadiusSearch)
+	for (auto i : neighborPoints)
 	{
 		localCloud->points.emplace_back((*cloud)[i]);
 	}
@@ -90,10 +90,13 @@ void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& 
 	
 	feature_extractor.getEigenValues(major_value, middle_value, minor_value);
 	feature_extractor.getEigenVectors(major_vector, middle_vector, minor_vector);
-	float principal_Directivity = major_value / (major_value + middle_value + minor_value);
-	if (principal_Directivity > linearity)
+	principal_Directivity[cloudIteration] = major_value / (major_value + middle_value + minor_value);
+	if (principal_Directivity[cloudIteration] > linearity)
 	{
 		finishedContractionPoints.emplace(cloudIteration);
+		(*cloud)[cloudIteration].r = 0;
+		(*cloud)[cloudIteration].g = 255;
+		(*cloud)[cloudIteration].b = 0;
 		return;
 	}
 	//计算KNN
@@ -123,14 +126,15 @@ void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& 
 		+ major_vector[1]*major_vector[1] + major_vector[2]*major_vector[2]);
 	float cosANGLE = abs(result_Multi_Vector /(vectorNorm_local_displacement_vector*vectorNorm_major_vector));
 
-	field_move_vector = vectorNorm_local_displacement_vector * cosANGLE*(1 - principal_Directivity)*major_vector
+	field_move_vector = vectorNorm_local_displacement_vector * cosANGLE*(1 - principal_Directivity[cloudIteration])*major_vector
 		+ (local_displacement_vector - vectorNorm_local_displacement_vector * cosANGLE * major_vector);
 
 	//计算移动后的新点
 	searchPoint.x = searchPoint.x + field_move_vector[0];
 	searchPoint.y = searchPoint.y + field_move_vector[1];
 	searchPoint.z = searchPoint.z + field_move_vector[2];
-	searchPoint.r = 255;
+	//searchPoint.a = 0.9;
+	//searchPoint.r = 255;
 	//newLocalPoint.g = 255;
 	//newLocalPoint.b = 255;
 
@@ -138,7 +142,8 @@ void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& 
 
 }
 
-void dataManager::pointsContraction(int pointNeighborSize)
+//一次点云收缩
+void dataManager::pointsContraction()
 {
 	//如果已经达到收缩要求，在本次和之后的迭代中停止收缩
 	if (finishedContractionPoints.count(cloudIteration) == 0)
@@ -146,9 +151,9 @@ void dataManager::pointsContraction(int pointNeighborSize)
 		pcl::KdTreeFLANN<PointT> kdtree;
 		kdtree.setInputCloud(cloud);
 		getAverageNeigborSize(cloudIteration, KNNcontraction_K);
+		int radius = PCARadiusSize * 3;
 		int K = KNNcontraction_K;
 		//K个邻近点的平均距离的三倍范围内的点 用于计算PCA主向量
-		int radius = PCARadiusSize * 3;
 		searchPoint = (*cloud)[cloudIteration];
 
 		std::vector<int> pointIdxKNNSearch(K);
@@ -157,8 +162,8 @@ void dataManager::pointsContraction(int pointNeighborSize)
 
 
 		std::vector<int> pointIdxRadiusSearch;
-		std::vector<float> pointRadiusSquaredDistance;
-		kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+		//std::vector<float> pointRadiusSquaredDistance;
+		//kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
 
 		onePointContraction(pointIdxKNNSearch, pointIdxRadiusSearch);
 	}
@@ -174,38 +179,10 @@ void dataManager::pointsContraction(int pointNeighborSize)
 	}
 }
 
-void dataManager::pointsContraction()
-{
-	pcl::KdTreeFLANN<PointT> kdtree;
-	kdtree.setInputCloud(cloud);
-	int K = KNNcontraction_K;
-	int radius = downSamplingNeigborSize;
-	searchPoint = (*cloud)[cloudIteration];
-
-	std::vector<int> pointIdxKNNSearch(K);
-	std::vector<float> pointKNNSquaredDistance(K); 
-	kdtree.nearestKSearch(searchPoint, K, pointIdxKNNSearch, pointKNNSquaredDistance);
-
-
-	//std::vector<int> pointIdxRadiusSearch;
-	//std::vector<float> pointRadiusSquaredDistance;
-	//kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
-
-	onePointContraction(pointIdxKNNSearch);
-	if(cloudIteration < cloud->size() - 1)
-	{
-		cloudIteration++;
-	}
-	else
-	{
-		cloudIteration = 0;
-	}
-}
-
 
 void dataManager::getAverageNeigborSize(int pointSerialNumber, int pointNeighborSize)
 {
-	if (cloud->points.size() < 50)
+	if (cloud->points.size() < 30)
 	{
 		return;
 	}

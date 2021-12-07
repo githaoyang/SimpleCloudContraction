@@ -27,7 +27,8 @@ private:
 	dataManager* cloudManager;
 	extractSkeleton* skeletonManager;
 
-	int nodeIndice = 0;
+	int lineCount;
+
 
 private slots:
 	void openNextFrameSlot();
@@ -45,8 +46,10 @@ private slots:
 	void startVoxelTransformSlot();
 	void setVoxelSizeSlot();
 	void resetVoxelSlot();
-	void extractCurrentSkePointSlot();
-	void resetSkeletonPointSlot();
+	void extractCurrentNodeSlot();
+	void resetNodePointSlot();
 	void setNodeDensitySlot();
 	void connectNodesSlot();
+	void resetNodeConnectLineSlot();
+
 };

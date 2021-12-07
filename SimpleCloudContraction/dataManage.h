@@ -52,6 +52,7 @@ public:
 	float PCARadiusSize;							//用于PCA找主特征向量的邻域大小，为半径值
 	int downSamplingNeigborSize;					//体素下采样体素大小
 	float linearity;								//线性度，用于判断是否此点停止收缩
+	vector<float> principal_Directivity;			//主方向度，即每个点的线性度
 	int voxelSize;
 	unordered_set<int> finishedContractionPoints;	//完成收缩的点云列表
 	PointCloudT::Ptr cloud;							//点云指针 操作点云
@@ -68,9 +69,8 @@ public:
 	void onePointContraction(vector<int>& pointIdxKNNSearch);
 	void onePointContraction(vector<int>& pointIdxKNNSearch, vector<int>& pointIdxRadiusSearch);
 	void pointsContraction();
-	void pointsContraction(int pointNeighborSize);
 	int openPointCloud(string path);
-	void getAverageNeigborSize(int pointSerialNumber, int pointNeighborSize =15);
+	void getAverageNeigborSize(int pointSerialNumber, int pointNeighborSize =6);
 	void removeCloseAroundNeighborPoints();
 	void downSamplingNeighborPoints(int filterSize = 10);
 	void startVoxelTransform();
