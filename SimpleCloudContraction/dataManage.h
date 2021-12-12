@@ -66,14 +66,16 @@ public:
 	PointT max_point_AABB;
 	vector<Eigen::Vector3f> voxelCenter;
 
+
+
 	void onePointContraction(vector<int>& pointIdxKNNSearch);
-	void onePointContraction(vector<int>& pointIdxKNNSearch, vector<int>& pointIdxRadiusSearch);
 	void pointsContraction();
 	int openPointCloud(string path);
-	void getAverageNeigborSize(int pointSerialNumber, int pointNeighborSize =6);
+	void getAverageNeigborSize(int pointSerialNumber, int pointNeighborSize = 6);
 	void removeCloseAroundNeighborPoints();
-	void downSamplingNeighborPoints(int filterSize = 10);
+	void downSamplingNeighborPoints(int filterSize);
 	void startVoxelTransform();
+	void resetParameters();
 
 private:
 	PointT searchPoint;

@@ -4,19 +4,18 @@ dataManager::dataManager()
 {
 	cloud.reset(new PointCloudT);
 	rawCloud.reset(new PointCloudT);
-	nextFrameCloud.reset(new PointCloudT);
+	lastFrameCloud.reset(new PointCloudT);
 	voxelCloud.reset(new PointCloudT);
-	nextFrameCloud->resize(1);
-	cloud->resize(1);
-	rawCloud->resize(1);
-	pcl::io::loadPCDFile("G:/newOnePerson.pcd", *rawCloud);
+	lastFrameCloud->resize(1);
+
+	pcl::io::loadPCDFile("G:/person4.pcd", *rawCloud);
 	pcl::copyPointCloud(*rawCloud, *cloud);
 
 
 	cloudIteration = 0;
-	KNNcontraction_K = 5;
+	KNNcontraction_K = 10;
 	PCARadiusSize = 50;
-	downSamplingNeigborSize = 50;
+	downSamplingNeigborSize = 120;
 	linearity = 0.8;
 	voxelSize = 10;
 	principal_Directivity.assign(rawCloud->size(), 0);
@@ -32,46 +31,6 @@ int dataManager::openPointCloud(string path)
 }
 
 void dataManager::onePointContraction(vector<int>& neighborPoints)
-{
-	//获取局部邻域点云
-	pcl::PointCloud<PointT>::Ptr localCloud(new pcl::PointCloud<PointT>);
-	for (auto i : neighborPoints)
-	{
-		localCloud->points.emplace_back((*cloud)[i]);
-	}
-	//计算邻域中心
-	pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
-	feature_extractor.setInputCloud(localCloud);
-	feature_extractor.compute();
-
-	Eigen::Vector3f mass_center;
-	feature_extractor.getMassCenter(mass_center);
-
-	//对邻域中的每个点进行初步收缩，对应到原始点云中
-	for (int i = 0; i < neighborPoints.size(); i++)
-	{
-		PointT localPoint = (*cloud)[neighborPoints[i]];
-		Eigen::Vector3f displacementVector(mass_center[0] - localPoint.x, mass_center[1] - localPoint.y, mass_center[2] - localPoint.z);
-		PointT newLocalPoint;
-		float enlarge = 0.2;
-		newLocalPoint.x = localPoint.x + displacementVector[0] * enlarge;
-		newLocalPoint.y = localPoint.y + displacementVector[1] * enlarge;
-		newLocalPoint.z = localPoint.z + displacementVector[2] * enlarge;
-		newLocalPoint.r = 255;
-		//newLocalPoint.g = 255;
-		//newLocalPoint.b = 255;
-		float newLength = pow((newLocalPoint.x-searchPoint.x),2) 
-			+ pow((newLocalPoint.y - searchPoint.y),2) + pow((newLocalPoint.z - searchPoint.z),2);
-		if (newLength < PCARadiusSize)
-		{
-			newLocalPoint.a = 0.3;
-		}
-		(*cloud)[neighborPoints[i]] = newLocalPoint;
-		
-	}
-}
-
-void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& pointIdxRadiusSearch)
 {
 	//获取PCA局部邻域点云
 	pcl::PointCloud<PointT>::Ptr localCloud(new pcl::PointCloud<PointT>);
@@ -142,6 +101,7 @@ void dataManager::onePointContraction(vector<int>& neighborPoints, vector<int>& 
 
 }
 
+
 //一次点云收缩
 void dataManager::pointsContraction()
 {
@@ -159,15 +119,8 @@ void dataManager::pointsContraction()
 		std::vector<int> pointIdxKNNSearch(K);
 		std::vector<float> pointKNNSquaredDistance(K);
 		kdtree.nearestKSearch(searchPoint, K, pointIdxKNNSearch, pointKNNSquaredDistance);
-
-
-		std::vector<int> pointIdxRadiusSearch;
-		//std::vector<float> pointRadiusSquaredDistance;
-		//kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance);
-
-		onePointContraction(pointIdxKNNSearch, pointIdxRadiusSearch);
+		onePointContraction(pointIdxKNNSearch);
 	}
-
 
 	if (cloudIteration < cloud->size() - 1)
 	{
@@ -249,7 +202,12 @@ void dataManager::startVoxelTransform()
 		Eigen::Vector3f center(floor(x / voxelSize)*voxelSize + voxelSize / 2, 
 			floor(y / voxelSize)*voxelSize + voxelSize / 2, floor(z / voxelSize)*voxelSize + voxelSize / 2);
 		voxelCenter.emplace_back(center);
-
 	}
+}
 
+void dataManager::resetParameters()
+{
+	finishedContractionPoints.clear();
+	principal_Directivity.clear();
+	voxelCenter.clear();
 }

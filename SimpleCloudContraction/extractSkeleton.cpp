@@ -2,6 +2,8 @@
 
 extractSkeleton::extractSkeleton()
 {
+	bodyCloud.reset(new PointCloudT);
+	
 	circleSize = 10;
 	cloudIteration = 0;
 	nodeDensity = 12;
@@ -10,7 +12,7 @@ extractSkeleton::extractSkeleton()
 	skeletonGraph = new Graph();
 }
 
-void extractSkeleton::prepareExtractNodePoint(PointCloudT::Ptr acloud)
+void extractSkeleton::prepareExtractNodePoint(PointCloudT::Ptr acloud, dataManager* cloudManager1)
 {
 	isPointVisited.clear();
 	isPointVisited.assign(acloud->size(), false);
@@ -25,6 +27,8 @@ void extractSkeleton::prepareExtractNodePoint(PointCloudT::Ptr acloud)
 		pow(min_point_AABB.y - max_point_AABB.y, 2) + pow(min_point_AABB.z - max_point_AABB.z, 2)) / nodeDensity;
 
 	kdtree.setInputCloud(cloud);
+	cloudManager = cloudManager1;
+	resetParameter();
 }
 
 int extractSkeleton::extractCurrentNodePoint()
@@ -119,6 +123,8 @@ void extractSkeleton::removeDuplicatedNode()
 //找最远的点（在主特征向量方向上）作为下一个node节点
 void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<float>& pointRadiusSquaredDistance)
 {
+	float linearitySum = 0;
+
 	//主特征向量方向 同向和反向 都可能有下一个node节点
 	unordered_map<int, float> distanceDic;
 	unordered_map<int, float> distanceDicOpposition;
@@ -127,7 +133,9 @@ void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<flo
 	for (auto i : pointIdxRadiusSearch)
 	{
 		localCloud->points.emplace_back((*cloud)[i]);
+		linearitySum += cloudManager->principal_Directivity[i];
 	}
+	nodeListNeighborAverageLinearity.emplace_back(linearitySum/ pointIdxRadiusSearch.size());
 	//计算邻域中心
 	pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
 	feature_extractor.setInputCloud(localCloud);
@@ -137,8 +145,13 @@ void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<flo
 	Eigen::Vector3f major_vector, middle_vector, minor_vector;
 	Eigen::Vector3f mass_center;
 	Eigen::Vector3f displacement_vector;
+	feature_extractor.getEigenValues(major_value, middle_value, minor_value);
 	feature_extractor.getEigenVectors(major_vector, middle_vector, minor_vector);
 	feature_extractor.getMassCenter(mass_center);
+
+	float nodeLinearity = major_value / (major_value + middle_value + minor_value);
+	nodeListLinearity.emplace_back(nodeLinearity);
+
 	for (int i = 0; i < pointIdxRadiusSearch.size(); i++)
 	{
 		if (isPointVisited[pointIdxRadiusSearch[i]] == true)
@@ -186,7 +199,7 @@ void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<flo
 		nextNodePoint.x = ((*cloud)[id].x + (*cloud)[secondid].x) / 2;
 		nextNodePoint.y = ((*cloud)[id].y + (*cloud)[secondid].y) / 2;
 		nextNodePoint.z = ((*cloud)[id].z + (*cloud)[secondid].z) / 2;
-		nextNodePoint.r = 255;
+		//nextNodePoint.r = 255;
 		nextNode.emplace(nextNodePoint);
 		nodeList.emplace_back(nextNodePoint);
 	}
@@ -210,7 +223,7 @@ void extractSkeleton::findNextNode(vector<int>& pointIdxRadiusSearch, vector<flo
 		nextNodePoint.x = ((*cloud)[id].x + (*cloud)[secondid].x) / 2;
 		nextNodePoint.y = ((*cloud)[id].y + (*cloud)[secondid].y) / 2;
 		nextNodePoint.z = ((*cloud)[id].z + (*cloud)[secondid].z) / 2;
-		nextNodePoint.r = 255;
+		//nextNodePoint.r = 255;
 		nextNode.emplace(nextNodePoint);
 		nodeList.emplace_back(nextNodePoint);
 	}
@@ -283,11 +296,16 @@ void extractSkeleton::prepareNodesDataStructure()
 			sumLength = sumLength + pointKNNSquaredDistance[i];
 			averageLength = sumLength / (leftNodeList.size() + 1);
 			leftNodeList.emplace(pointIndice);
+			if (skeletonGraph->adjList[pointIndice]->inNode >= 1)
+			{
+				continue;
+			}
 			edge = new ArcNode();
 			edge->adjvex = pointIndice;
 			edge->next = skeletonGraph->adjList[currentNodeIndice]->firstedge;
 			skeletonGraph->adjList[currentNodeIndice]->firstedge = edge;
-			break;
+			skeletonGraph->adjList[pointIndice]->inNode++;
+			//break;
 		}
 		skeletonGraph->adjList[currentNodeIndice]->isVisited = true;
 	}
@@ -297,4 +315,120 @@ void extractSkeleton::prepareNodesDataStructure()
 void extractSkeleton::visitAllNodes() 
 {
 
+}
+
+void extractSkeleton::getLeftPointCloud()
+{
+	//寻找已经收缩完成node的邻域点
+	for (int nodeIndice = 0; nodeIndice < nodeList.size(); nodeIndice++)
+	{
+		float linearity1 = nodeListLinearity[nodeIndice];
+		float lineartiy2 = nodeListNeighborAverageLinearity[nodeIndice];
+		if ((linearity1 > 0.75) || (lineartiy2 > 0.8))
+		{
+			getContractedNodeNeighborPoints(nodeIndice);
+			selectedNodeList.emplace_back(nodeList[nodeIndice]);
+		}
+	}
+	//将剩余的身体部位的点云加入新点云中
+	for (int pointIndice = 0; pointIndice < cloud->points.size(); pointIndice++)
+	{
+		if (contractionFinishedPartNodeNeighborPoints.count(pointIndice) == 0)
+		{
+			bodyCloud->points.emplace_back((*cloud)[pointIndice]);
+		}
+	}
+
+	//去除原有节点中离身体中心节点太近的点，并将它们加入身体点云
+	//计算邻域中心
+	pcl::MomentOfInertiaEstimation<PointT> feature_extractor;
+	feature_extractor.setInputCloud(bodyCloud);
+	feature_extractor.compute();
+
+	Eigen::Vector3f mass_center;
+	feature_extractor.getMassCenter(mass_center);
+	set<int> addBodyPointsList;
+	for(auto i = selectedNodeList.begin(); i != selectedNodeList.end(); i++)
+	{
+		float distanceOfPointi = sqrt(pow((*i).x - mass_center[0], 2) + pow((*i).y - mass_center[1], 2) + pow((*i).z - mass_center[2], 2));
+		if (distanceOfPointi < 900)
+		{
+			PointT oneBodyPoint = *i;
+			i = selectedNodeList.erase(i);
+			i--;
+			std::vector<int> pointIdxRadiusSearch;
+			std::vector<float> pointRadiusSquaredDistance;
+			kdtree.radiusSearch(oneBodyPoint, circleSize, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+			for (auto j : pointIdxRadiusSearch)
+			{
+				addBodyPointsList.emplace(j);
+			}
+		}
+	}
+	
+	for (auto j : addBodyPointsList)
+	{
+		bodyCloud->points.emplace_back((*cloud)[j]);
+	}
+	bodyCloud->height = 1;
+	bodyCloud->width = bodyCloud->size();
+}
+
+void extractSkeleton::getContractedNodeNeighborPoints(int indice)
+{
+	std::vector<int> pointIdxRadiusSearch;
+	std::vector<float> pointRadiusSquaredDistance;
+	kdtree.radiusSearch(nodeList[indice], circleSize, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+	for (auto i : pointIdxRadiusSearch)
+	{
+		contractionFinishedPartNodeNeighborPoints.emplace(i);
+	}
+}
+
+void extractSkeleton::extractOneListNode()
+{
+	//如果队列为空
+	if (nextNode.empty() == true)
+	{
+		//寻找下一个没有访问的点作为node搜索起点
+		while (isPointVisited[cloudIteration] == true)
+		{
+			cloudIteration++;
+			if (cloudIteration >= cloud->size())
+			{
+				return;
+			}
+		}
+		isPointVisited[cloudIteration] = true;
+		nextNode.emplace((*cloud)[cloudIteration]);
+		nodeList.emplace_back((*cloud)[cloudIteration]);
+	}
+	do
+	{
+		
+		searchPoint = nextNode.front();
+		nextNode.pop();
+
+		std::vector<int> pointIdxRadiusSearch;
+		std::vector<float> pointRadiusSquaredDistance;
+		kdtree.radiusSearch(searchPoint, circleSize, pointIdxRadiusSearch, pointRadiusSquaredDistance);
+
+		findNextNode(pointIdxRadiusSearch, pointRadiusSquaredDistance);
+
+	} while (nextNode.empty() == false);
+
+}
+
+void extractSkeleton::resetParameter()
+{
+	cloudIteration = 0;
+	nodeList.clear();
+	nodeIteration = 0;
+	nodeListLinearity.clear();
+	nodeListNeighborAverageLinearity.clear();
+	while (nextNode.empty() == false)
+	{
+		nextNode.pop();
+	}
+	contractionFinishedPartNodeNeighborPoints.clear();
 }

@@ -24,6 +24,7 @@ private:
 	
 
 	void showPointCloud();
+	void showPointCloud(PointCloudT::Ptr cloud);
 	dataManager* cloudManager;
 	extractSkeleton* skeletonManager;
 
@@ -31,8 +32,8 @@ private:
 
 
 private slots:
+
 	void openNextFrameSlot();
-	void pointCloudUpdateSlot(PointCloudT::Ptr c);
 	void pointCloudCreateShow();
 	void setNeighborSizeSlot();
 	void setRawPointCloudSlot();
@@ -50,6 +51,7 @@ private slots:
 	void resetNodePointSlot();
 	void setNodeDensitySlot();
 	void connectNodesSlot();
-	void resetNodeConnectLineSlot();
+	void resetConnectLineSlot();
+	void searchNodeConnectLineSlot();
 
 };

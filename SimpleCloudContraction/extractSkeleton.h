@@ -28,6 +28,8 @@
 #include <vector>
 #include <queue>
 #include <stack>
+#include <set>
+#include "dataManage.h"
 
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
@@ -46,12 +48,17 @@ class extractSkeleton
 public:
 	extractSkeleton();
 	//用于提取关键点时准备所需数据结构
-	void prepareExtractNodePoint(PointCloudT::Ptr cloud);
+	void prepareExtractNodePoint(PointCloudT::Ptr cloud, dataManager* cloudManager);
 	int extractCurrentNodePoint();
+	void extractOneListNode();
 	void findNextNode(vector<int>& pointIdxRadiusSearch, vector<float>& pointRadiusSquaredDistance);
 	void connectSkeltonNode(int circleSize);
 	void removeDuplicatedNode();
 	void visitAllNodes();
+	void getLeftPointCloud();
+	void getContractedNodeNeighborPoints(int indice);
+	void resetParameter();
+	dataManager* cloudManager;
 
 	//用于连接节点时准备所需数据（图）结构
 	void prepareNodesDataStructure();
@@ -59,6 +66,7 @@ public:
 	pcl::KdTreeFLANN<PointT> kdtree;
 	PointCloudT::Ptr cloud;							//点云指针 操作点云
 	PointCloudT::Ptr localNodeCloud;
+	PointCloudT::Ptr bodyCloud;
 	PointT min_point_AABB;
 	PointT max_point_AABB;
 	PointT searchPoint;
@@ -67,13 +75,17 @@ public:
 	int nodeIteration;
 	int nodeDensity; 
 	int maxHeightPointIndice;
+	set<int> contractionFinishedPartNodeNeighborPoints;
 
 	//用于提取关键点时判断节点是否访问过
 	vector<bool> isPointVisited;
 	//用于判断node节点的队列
 	queue<PointT> nextNode;
 	//node列表
-	vector<PointT> nodeList;
+	vector<PointT> nodeList; 
+	vector<PointT> selectedNodeList;
+	vector<float> nodeListLinearity;
+	vector<float> nodeListNeighborAverageLinearity;
 	//node节点图结构指针
 	Graph* skeletonGraph;
 
@@ -107,5 +119,6 @@ struct VertexNode
 	int vertex;
 	ArcNodePtr firstedge = nullptr;
 	bool isVisited = false;
+	int inNode = 0;
 	bool isConnected = false;
 };

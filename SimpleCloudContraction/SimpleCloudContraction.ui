@@ -14,16 +14,6 @@
    <string>SimpleCloudContraction</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_3">
-   <item row="0" column="2">
-    <widget class="QVTKWidget" name="screen">
-     <property name="minimumSize">
-      <size>
-       <width>600</width>
-       <height>500</height>
-      </size>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="0">
     <widget class="QTabWidget" name="functiontab">
      <property name="sizePolicy">
@@ -275,109 +265,120 @@
       <attribute name="title">
        <string>骨骼化</string>
       </attribute>
-      <widget class="QWidget" name="layoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>10</x>
-         <y>410</y>
-         <width>151</width>
-         <height>51</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="verticalLayout">
-        <item>
-         <widget class="QLabel" name="label_5">
-          <property name="text">
-           <string>转换状态：</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="transformStatusLabel">
-          <property name="text">
-           <string/>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QGroupBox" name="groupBox_2">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>10</y>
-         <width>181</width>
-         <height>111</height>
-        </rect>
-       </property>
-       <property name="title">
-        <string>提取节点</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_4">
-        <item row="0" column="0">
-         <widget class="QPushButton" name="extractCurrentNodeButton">
-          <property name="text">
-           <string>提取关键点</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="resetNodeButton">
-          <property name="text">
-           <string>恢复</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0" colspan="2">
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QLabel" name="label_6">
+      <layout class="QGridLayout" name="gridLayout_7">
+       <item row="0" column="0">
+        <widget class="QGroupBox" name="groupBox_2">
+         <property name="title">
+          <string>提取节点</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="0" column="0">
+           <widget class="QPushButton" name="extractCurrentNodeButton">
             <property name="text">
-             <string>节点密度：</string>
+             <string>提取关键点</string>
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QLineEdit" name="nodeDensityLineEdit">
+          <item row="0" column="1">
+           <widget class="QPushButton" name="resetNodeButton">
             <property name="text">
-             <string>9</string>
+             <string>恢复</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QLabel" name="label_6">
+              <property name="text">
+               <string>节点密度：</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="nodeDensityLineEdit">
+              <property name="text">
+               <string>9</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="groupBox_3">
+         <property name="title">
+          <string>连接节点</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_5">
+          <item row="0" column="0">
+           <widget class="QPushButton" name="connectNodesButton">
+            <property name="text">
+             <string>连接节点</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QPushButton" name="resetConnectedLinesButton">
+            <property name="text">
+             <string>恢复</string>
             </property>
            </widget>
           </item>
          </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QGroupBox" name="groupBox_3">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>130</y>
-         <width>181</width>
-         <height>61</height>
-        </rect>
-       </property>
-       <property name="title">
-        <string>连接节点</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_5">
-        <item row="0" column="0">
-         <widget class="QPushButton" name="connectNodesButton">
-          <property name="text">
-           <string>连接节点</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="resetConnectedLinesButton">
-          <property name="text">
-           <string>恢复</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QGroupBox" name="groupBox_4">
+         <property name="title">
+          <string>提取并连接节点</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_6">
+          <item row="0" column="0">
+           <widget class="QPushButton" name="searchAndConnectButton">
+            <property name="text">
+             <string>一次提取</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QTextBrowser" name="skeleTextBrowser"/>
+       </item>
+       <item row="4" column="0">
+        <layout class="QVBoxLayout" name="verticalLayout">
+         <item>
+          <widget class="QLabel" name="label_5">
+           <property name="text">
+            <string>转换状态：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="transformStatusLabel">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
      </widget>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QVTKWidget" name="screen">
+     <property name="minimumSize">
+      <size>
+       <width>600</width>
+       <height>500</height>
+      </size>
+     </property>
     </widget>
    </item>
   </layout>
